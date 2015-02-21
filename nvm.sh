@@ -43,10 +43,17 @@ nvm_download() {
     ARGS=$(echo "$*" | command sed -e 's/--progress-bar /--progress=bar /' \
                            -e 's/-L //' \
                            -e 's/-I /--server-response /' \
-                           -e 's/-s /-q /' \
+                           -e 's/-s /-nv /' \
+                           -e 's/-S //' \
                            -e 's/-o /-O /' \
                            -e 's/-C - /-c /')
-    eval wget $ARGS
+    # save standard error from wget to file descriptor 3, but print it only if wget fails
+    exec 3>&1
+    WGET_ERROR=$( { eval wget $ARGS 1>&3 ; } 2>&1 )
+    if ! [ $? = "0" ] ; then
+      echo "$WGET_ERROR" >&2
+    fi
+    exec 3>&-
   fi
 }
 
@@ -624,7 +631,7 @@ nvm_ls_remote() {
   else
     PATTERN=".*"
   fi
-  VERSIONS=`nvm_download -L -s $NVM_NODEJS_ORG_MIRROR/ -o - \
+  VERSIONS=`nvm_download -L -s -S $NVM_NODEJS_ORG_MIRROR/ -o - \
               | \egrep -o 'v[0-9]+\.[0-9]+\.[0-9]+' \
               | command grep -w "${PATTERN}" \
               | sort -t. -u -k 1.2,1n -k 2,2n -k 3,3n`
@@ -644,7 +651,7 @@ nvm_ls_remote_iojs() {
   else
     PATTERN=".*"
   fi
-  VERSIONS="$(nvm_download -L -s $NVM_IOJS_ORG_VERSION_LISTING -o - \
+  VERSIONS="$(nvm_download -L -s -S $NVM_IOJS_ORG_VERSION_LISTING -o - \
     | command sed 1d \
     | command sed "s/^/$(nvm_iojs_prefix)-/" \
     | command cut -f1 \
